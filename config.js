@@ -5,7 +5,7 @@ export const CONFIG = {
   firebase: null,
   // 예: { apiKey: "...", authDomain: "...", projectId: "...", appId: "..." }
 
-  // 측정 시간(기기의 현지 시각 기준, 24시간제)
+  // 측정 시간 기본값(기기의 현지 시각 기준, 24시간제). 거실 폰 탭에서 폰마다 바꿀 수 있어요.
   window: { start: 18, end: 20 },
 
   // 몇 분마다 한 번씩 분석하고 원본 글자를 버릴지

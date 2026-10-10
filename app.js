@@ -56,6 +56,27 @@ let readings = [];
 let selectedDay = null;
 let ticking = false;
 
+/* 측정 시간: 기본값은 config.js, 폰마다 거실 폰 탭에서 바꿀 수 있어요 */
+const toMin = (s) => {
+  const [h, m] = s.split(':').map(Number);
+  return h * 60 + m;
+};
+const atMinutes = (base, m) => {
+  const d = new Date(base);
+  d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+  return d;
+};
+function loadWindow() {
+  try {
+    const w = JSON.parse(lsGet('jibon:win', 'null'));
+    if (w && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end) && toMin(w.end) > toMin(w.start)) return w;
+  } catch {
+    /* 기본값 사용 */
+  }
+  return { start: `${pad(CONFIG.window.start)}:00`, end: `${pad(CONFIG.window.end)}:00` };
+}
+let win = loadWindow();
+
 /* ---------- 색 ---------- */
 function cssHex(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -153,7 +174,7 @@ function renderHero(focus, today, s) {
     : '';
   const empty = s.count === 0;
   const comment = empty
-    ? `아직 측정된 기록이 없어요. 거실 폰에서 ${CONFIG.window.start}시에 측정이 시작돼요.`
+    ? '아직 측정된 기록이 없어요. 거실 폰에서 측정을 시작하면 여기에 나타나요.'
     : s.comment;
   $('#hero').innerHTML = `
     <div class="thermo">${thermometerSVG(s.temp)}</div>
@@ -162,7 +183,7 @@ function renderHero(focus, today, s) {
       <p class="temp">${tempText}</p>
       ${chip}
       <p class="comment">${comment}</p>
-      <p class="meta">측정 ${s.count}회 · ${pad(CONFIG.window.start)}:00–${pad(CONFIG.window.end)}:00</p>
+      <p class="meta">측정 ${s.count}회</p>
       ${tags}
       ${empty ? '<button class="link-btn" type="button" data-go="room">거실 폰 화면으로 가기</button>' : ''}
     </div>`;
@@ -320,6 +341,7 @@ let msgText = '';
 let autoStart = lsGet('jibon:auto', '1') === '1';
 let autoBlocked = false;
 let pausedDay = null; // 오늘은 직접 멈췄으면 자동 시작을 쉬어요
+let manualRun = false; // 측정 시간 밖에 직접 시작했으면 직접 멈출 때까지 계속해요
 
 const rec = new Recorder({
   lang: CONFIG.lang,
@@ -341,10 +363,8 @@ const rec = new Recorder({
 });
 
 function windowInfo(now = new Date()) {
-  const s = new Date(now);
-  s.setHours(CONFIG.window.start, 0, 0, 0);
-  const e = new Date(now);
-  e.setHours(CONFIG.window.end, 0, 0, 0);
+  const s = atMinutes(now, toMin(win.start));
+  const e = atMinutes(now, toMin(win.end));
   if (now < s) return { phase: 'before', ms: s - now };
   if (now < e) return { phase: 'open', ms: e - now };
   const next = new Date(s);
@@ -371,14 +391,15 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && recording) requestWake();
 });
 
-function setBanner(on) {
+function setBanner(on, manual = false) {
   $('#rec-banner').hidden = !on;
   document.body.classList.toggle('recording', on);
-  $('#rec-banner-sub').textContent = on ? `${pad(CONFIG.window.end)}:00에 자동으로 끝나요` : '';
+  $('#rec-banner-sub').textContent = on ? (manual ? '직접 멈출 때까지 듣고 있어요' : `${win.end}에 자동으로 끝나요`) : '';
 }
 
 function forceStopLocal() {
   recording = false;
+  manualRun = false;
   clearInterval(chunkTimer);
   rec.stop();
   releaseWake();
@@ -411,8 +432,9 @@ async function flush(final) {
   await save({ ...base, temp: scoreToTemp(a.score), words: a.words, tags: a.tags });
 }
 
-function startRecording() {
-  if (recording || !rec.supported || windowInfo().phase !== 'open') return;
+function startRecording(manual = false) {
+  if (recording || !rec.supported) return;
+  manualRun = manual && windowInfo().phase !== 'open';
   recording = true;
   msgText = '';
   chunkWords = 0;
@@ -420,13 +442,14 @@ function startRecording() {
   rec.start();
   chunkTimer = setInterval(() => flush(false), CONFIG.chunkMinutes * 60 * 1000);
   requestWake();
-  setBanner(true);
+  setBanner(true, manualRun);
   paintRoom();
 }
 
 async function stopRecording() {
   if (!recording) return;
   recording = false;
+  manualRun = false;
   clearInterval(chunkTimer);
   rec.stop();
   await new Promise((resolve) => setTimeout(resolve, 800));
@@ -438,22 +461,25 @@ async function stopRecording() {
 
 function paintRoom() {
   const info = windowInfo();
-  const { start, end } = CONFIG.window;
-  $('#window-label').textContent = `${pad(start)}:00 – ${pad(end)}:00`;
+  $('#window-label').textContent = `${win.start} – ${win.end}`;
+  const manualHint = '지금 바로 하려면 아래 버튼을 눌러 주세요.';
   let head;
   let sub;
-  if (recording) {
+  if (recording && manualRun) {
     head = '측정 중이에요';
-    sub = `${pad(end)}:00까지 ${fmtDur(info.ms)} 남았어요 · 이번 구간 ${chunkWords}단어`;
+    sub = `직접 멈출 때까지 들어요 · 이번 구간 ${chunkWords}단어`;
+  } else if (recording) {
+    head = '측정 중이에요';
+    sub = `${win.end}까지 ${fmtDur(info.ms)} 남았어요 · 이번 구간 ${chunkWords}단어`;
   } else if (info.phase === 'open') {
     head = '지금 측정할 수 있어요';
     sub = autoStart ? '자동 시작이 켜져 있어요.' : '버튼을 눌러 시작해 주세요.';
   } else if (info.phase === 'before') {
-    head = `${start}시에 시작해요`;
-    sub = `${fmtDur(info.ms)} 후`;
+    head = `${win.start}에 시작해요`;
+    sub = `${autoStart ? `${fmtDur(info.ms)} 후 자동으로 시작해요.` : '자동 시작이 꺼져 있어요.'} ${manualHint}`;
   } else {
     head = '오늘 측정이 끝났어요';
-    sub = `다음 측정까지 ${fmtDur(info.ms)}`;
+    sub = `다음 측정까지 ${fmtDur(info.ms)}. ${manualHint}`;
   }
   $('#room-headline').textContent = head;
   $('#room-sub').textContent = sub;
@@ -463,12 +489,9 @@ function paintRoom() {
   if (recording) {
     btn.textContent = '측정 멈추기';
     btn.disabled = false;
-  } else if (info.phase === 'open') {
-    btn.textContent = '측정 시작';
-    btn.disabled = !rec.supported;
   } else {
-    btn.textContent = '측정 시간이 아니에요';
-    btn.disabled = true;
+    btn.textContent = info.phase === 'open' ? '측정 시작' : '지금 바로 측정 시작';
+    btn.disabled = !rec.supported;
   }
   $('#room-msg').textContent = rec.supported
     ? msgText
@@ -513,7 +536,7 @@ function tick() {
   const now = new Date();
   $('#now').textContent = now.toLocaleString('ko-KR', { weekday: 'long', hour: 'numeric', minute: '2-digit' });
   const phase = windowInfo(now).phase;
-  if (recording && phase !== 'open') {
+  if (recording && !manualRun && phase !== 'open') {
     stopRecording();
   } else if (autoStart && !recording && !autoBlocked && pausedDay !== dayKey(now) && phase === 'open' && rec.supported) {
     startRecording();
@@ -599,7 +622,7 @@ $('#rec-btn').addEventListener('click', () => {
     stopRecording();
   } else {
     pausedDay = null;
-    startRecording();
+    startRecording(true);
   }
 });
 
@@ -617,6 +640,29 @@ document.querySelectorAll('.mood').forEach((b) =>
     toast('기록했어요');
   }),
 );
+
+/* 측정 시간 */
+$('#win-start').value = win.start;
+$('#win-end').value = win.end;
+function onWindowChange() {
+  const s = $('#win-start').value;
+  const e = $('#win-end').value;
+  const msg = $('#win-msg');
+  if (!s || !e) return;
+  if (toMin(e) <= toMin(s)) {
+    msg.textContent = '끝나는 시간이 시작 시간보다 늦어야 해요.';
+    return;
+  }
+  msg.textContent = '';
+  win = { start: s, end: e };
+  lsSet('jibon:win', JSON.stringify(win));
+  autoBlocked = false;
+  pausedDay = null;
+  paintRoom();
+  toast('측정 시간을 바꿨어요');
+}
+$('#win-start').addEventListener('change', onWindowChange);
+$('#win-end').addEventListener('change', onWindowChange);
 
 /* 설정 */
 const dlg = $('#settings');
