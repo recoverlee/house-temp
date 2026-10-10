@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 집 코드(경로의 {code})를 아는 기기만 읽고 쓸 수 있어요. 코드는 24자리 무작위 문자열이에요.
+    match /homes/{code}/readings/{id} {
+      allow read, delete: if code.size() >= 16;
+      allow create: if code.size() >= 16
+        && request.resource.data.keys().hasOnly(['ts', 'day', 'temp', 'tags', 'words', 'quiet', 'source'])
+        && request.resource.data.ts is number
+        && request.resource.data.day is string
+        && request.resource.data.tags is list
+        && (!('temp' in request.resource.data)
+            || (request.resource.data.temp is number
+                && request.resource.data.temp >= 0
+                && request.resource.data.temp <= 50));
+    }
+  }
+}

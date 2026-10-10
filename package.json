@@ -1,0 +1,9 @@
+{
+  "name": "house-temp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/analyzer.test.mjs",
+    "start": "python3 -m http.server 8080"
+  }
+}

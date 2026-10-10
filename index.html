@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>집안 온도계</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="rec-banner" class="rec-banner" role="status" hidden>
+  <span class="rec-dot" aria-hidden="true"></span>
+  <div class="rec-text">
+    <strong>녹음 중</strong>
+    <span id="rec-banner-sub"></span>
+  </div>
+</div>
+
+<section id="setup" class="app" hidden>
+  <header class="top">
+    <div>
+      <h1>집안 온도계</h1>
+      <p class="muted small">거실 폰과 내 폰을 같은 집 코드로 연결해요.</p>
+    </div>
+  </header>
+  <div class="card stack">
+    <button id="btn-create" class="btn primary" type="button">새 집 코드 만들기</button>
+    <form id="join-form" class="stack" autocomplete="off">
+      <label for="join-input" class="small muted">이미 코드가 있어요</label>
+      <input id="join-input" class="input" type="text" inputmode="text" autocapitalize="none" spellcheck="false" placeholder="집 코드 붙여넣기">
+      <button class="btn" type="submit">연결하기</button>
+      <p id="join-error" class="error small" role="alert"></p>
+    </form>
+  </div>
+</section>
+
+<main id="app" class="app" hidden>
+  <header class="top">
+    <div>
+      <h1>집안 온도계</h1>
+      <p id="now" class="muted small"></p>
+    </div>
+    <button id="btn-settings" class="icon-btn" type="button" aria-label="설정">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <p id="notice" class="notice" role="status" hidden></p>
+
+  <div class="tabs" role="tablist" aria-label="화면 선택">
+    <button class="tab" role="tab" id="tab-check" data-view="check" aria-selected="true" aria-controls="view-check" type="button">퇴근 전 확인</button>
+    <button class="tab" role="tab" id="tab-room" data-view="room" aria-selected="false" aria-controls="view-room" type="button">거실 폰</button>
+  </div>
+
+  <section id="view-check" role="tabpanel" aria-labelledby="tab-check" class="stack">
+    <article id="hero" class="card hero"></article>
+    <article class="card stack">
+      <h2>하루 흐름</h2>
+      <div id="flow"></div>
+    </article>
+    <article class="card stack">
+      <h2>최근 7일</h2>
+      <div id="week"></div>
+    </article>
+    <ul id="rows" class="rows"></ul>
+  </section>
+
+  <section id="view-room" role="tabpanel" aria-labelledby="tab-room" class="stack" hidden>
+    <article class="card stack">
+      <div>
+        <p class="eyebrow">측정 시간</p>
+        <p id="window-label" class="window"></p>
+      </div>
+      <div>
+        <p id="room-headline" class="headline"></p>
+        <p id="room-sub" class="muted"></p>
+      </div>
+      <button id="rec-btn" class="big-btn" type="button"></button>
+      <p id="room-msg" class="msg" role="alert"></p>
+      <label class="check" for="auto-start">
+        <input id="auto-start" type="checkbox">
+        <span>시간이 되면 자동으로 시작</span>
+      </label>
+    </article>
+
+    <article class="card stack">
+      <h2>직접 기록하기</h2>
+      <p class="muted small">녹음 없이 오늘 분위기를 바로 남겨요.</p>
+      <div class="moods">
+        <button class="mood" type="button" data-temp="26.5"><span class="swatch"></span><span>따뜻했어요</span></button>
+        <button class="mood" type="button" data-temp="22"><span class="swatch"></span><span>보통이에요</span></button>
+        <button class="mood" type="button" data-temp="16.5"><span class="swatch"></span><span>쌀쌀했어요</span></button>
+      </div>
+    </article>
+
+    <article class="card stack small-print">
+      <h2>음성은 이렇게 다뤄요</h2>
+      <ul>
+        <li>녹음 파일은 만들지 않아요. 말소리는 글자로 바뀐 뒤 분석되고, 분석이 끝나면 바로 버려져요.</li>
+        <li>저장되는 것은 시각, 온도, 분위기 키워드뿐이에요. 대화 내용은 저장되지 않아요.</li>
+        <li>음성을 글자로 바꾸는 일은 크롬의 음성 인식이 맡아요. 이 과정에서 음성이 Google 서버로 전송될 수 있어요.</li>
+        <li>화면 위쪽에 "녹음 중" 표시가 켜져 있는 동안에만 들어요.</li>
+        <li>안드로이드 크롬에서 화면을 켜 둔 채 충전기에 꽂아 두세요.</li>
+      </ul>
+    </article>
+  </section>
+</main>
+
+<p id="toast" class="toast" role="status" hidden></p>
+
+<dialog id="settings">
+  <form method="dialog" class="stack">
+    <h2>설정</h2>
+    <div class="stack">
+      <p class="small muted">집 코드</p>
+      <input id="code-field" class="input mono" type="text" readonly>
+      <button id="btn-copy" class="btn" type="button">다른 폰용 링크 복사</button>
+      <p id="settings-hint" class="small muted"></p>
+    </div>
+    <p id="store-mode" class="small"></p>
+    <div class="stack">
+      <button id="btn-clear" class="btn danger" type="button">오늘 기록 삭제</button>
+      <button id="btn-reset" class="btn" type="button">이 기기의 집 코드 바꾸기</button>
+    </div>
+    <button class="btn primary" type="submit">닫기</button>
+  </form>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
